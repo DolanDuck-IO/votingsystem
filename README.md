@@ -1,88 +1,90 @@
 # VotingSystem
 
-A research-oriented verifiable voting project inspired by three papers in this repository:
+一个面向信息安全竞赛与研究展示的可验证投票系统项目。
 
-- `2026-613.pdf` — Haechi: a keyless, commitment-based, in-person verifiable election design
-- `2026-565.pdf` — Zeeperio: succinct proof generation and automated verification for election audits
-- `2026-545.pdf` — Aggios: aggregator-based voting with partition proofs for scalable public verification
+本仓库围绕目录中的三篇论文展开：
 
-This project currently implements a runnable Python framework based primarily on the `2026-613` design and keeps explicit extension points for integrating ideas from `2026-565` and `2026-545`.
+- `2026-613.pdf`：Haechi，基于承诺的无密钥线下可验证投票方案
+- `2026-565.pdf`：Zeeperio，面向选举审计的紧凑证明与自动化验证方案
+- `2026-545.pdf`：Aggios，基于聚合器与分区证明的可扩展公开可验证投票方案
 
-## Project Status
+当前项目已经实现了一套以 `2026-613` 为核心的 Python 原型框架，并为 `2026-565` 与 `2026-545` 的后续接入预留了明确的扩展接口。
 
-Current status: `working prototype`
+## 项目定位
 
-What is already available:
+当前状态：`可运行原型（working prototype）`
 
-- end-to-end demo flow
-- election manifest and ballot encoding
-- Pedersen-style vector commitment layer
-- cast / challenge workflow
-- public election record
-- aggregate tally opening and verification
-- extension interfaces for future proof backends and aggregation backends
+已经具备：
 
-What is not yet production-grade:
+- 端到端演示流程
+- 选举清单与选票编码
+- Pedersen 风格向量承诺层
+- `cast / challenge` 投票流程
+- 公共选举记录
+- 聚合计票开封与公开验证
+- 面向未来证明后端与聚合后端的扩展接口
 
-- real zero-knowledge proof backend
-- service deployment layer
-- database persistence
-- user-facing web UI
-- on-chain or smart-contract verifier
-- aggregator workflow from Aggios
+尚未达到生产级：
 
-So this repository should be understood as a strong architectural prototype, not a final election product.
+- 真实零知识证明后端
+- 服务化部署层
+- 数据库持久化
+- 面向选民/管理员/审计者的 Web 界面
+- 链上或智能合约验证器
+- Aggios 风格聚合器工作流
 
-## Why This Repository Exists
+因此，本仓库目前更适合被理解为“架构完整、流程可跑通的研究型原型”，而不是可直接用于真实选举的最终系统。
 
-The goal of this project is to evolve from a paper-study prototype into a competition-ready information security project with:
+## 项目目标
 
-- a clear cryptographic story
-- a verifiable end-to-end voting workflow
-- modular proof and verification backends
-- room for system engineering, interface design, and security demonstrations
+这个项目的目标，不只是复现论文中的某一个密码学细节，而是逐步发展为一个适合信息安全作品赛展示的完整系统，具备以下特点：
 
-In other words, the project is designed to be a practical foundation for a serious security competition submission rather than just a one-off script.
+- 有清晰的密码学设计主线
+- 有可解释的端到端投票与验证流程
+- 有可替换、可扩展的证明与验证后端
+- 有继续工程化、服务化、界面化的空间
 
-## Core Design Choice
+换句话说，这个仓库既是论文研究的落地点，也是后续参赛作品的工程基础。
 
-The current implementation uses `2026-613 / Haechi` as the system backbone because it gives the cleanest high-level architecture:
+## 为什么以 2026-613 为核心
 
-1. load an election manifest
-2. collect a voter's selections on a device
-3. encode the whole ballot as a vector
-4. create one commitment for the whole ballot
-5. generate a confirmation-code chain
-6. let the voter either cast or challenge
-7. publish cast ballots to a public record
-8. open the aggregate commitment after voting ends
-9. let public verifiers check tally consistency
+当前实现选择以 `2026-613 / Haechi` 作为系统主干，原因是它在工程上最适合作为第一阶段基础架构：
 
-This model is simpler to implement and easier to explain than starting directly from zk-SNARK tooling or aggregator-heavy workflows.
+1. 载入选举配置
+2. 设备采集选民选择
+3. 将整张选票编码为向量
+4. 对整张票生成单个承诺
+5. 生成确认码链
+6. 允许选民选择 `cast` 或 `challenge`
+7. 将已投票记录到公共选举记录中
+8. 在投票结束后公开聚合承诺与聚合开封
+9. 由公共验证者检查计票一致性
 
-## Architecture Overview
+相比一开始就直接进入 zk-SNARK 或聚合器协议实现，这一模型更容易搭建、演示和解释，也更适合作为竞赛项目的第一阶段版本。
 
-The current codebase is organized around the following components:
+## 架构概览
+
+当前代码主要由以下几个核心组件组成：
 
 - `ElectionManifest`
-  Defines contests, candidates, and ballot rules.
+  定义选举项目、候选人、每个竞赛项的投票规则。
 
 - `VotingDevice`
-  Simulates a Haechi-style polling device that prepares ballots, issues confirmation codes, supports cast/challenge, and maintains the running tally.
+  模拟 Haechi 风格的投票设备，负责准备选票、生成确认码、支持 `cast/challenge`、维护运行时 tally。
 
 - `PedersenContext`
-  Implements the commitment layer used for whole-ballot commitments and aggregate openings.
+  实现当前原型使用的承诺层，用于整票承诺和聚合开封验证。
 
 - `ElectionRecord`
-  Stores the public election record, including cast ballots and challenged ballots.
+  存储公共选举记录，包括已投选票与挑战选票。
 
 - `ElectionVerifier`
-  Verifies the confirmation-code chain, challenged openings, aggregate commitment, and tally opening.
+  负责验证确认码链、挑战票开封、聚合承诺以及最终 tally 开封。
 
 - `Proof Backends`
-  The current implementation uses placeholder proof objects so the full data flow can run end-to-end. These interfaces are intentionally pluggable.
+  当前使用占位式证明对象来跑通完整数据流，后续可以替换为真实的密码学证明后端。
 
-## Repository Layout
+## 仓库结构
 
 ```text
 .
@@ -107,133 +109,139 @@ The current codebase is organized around the following components:
     `-- test_demo_flow.py
 ```
 
-## Quick Start
+## 快速开始
 
-Requirements:
+环境要求：
 
 - Python `3.10+`
 
-Run the demo from PowerShell:
+在 PowerShell 中运行演示：
 
 ```powershell
 $env:PYTHONPATH = "src"
 python -m haechi_voting.demo
 ```
 
-Run the test suite:
+运行测试：
 
 ```powershell
 $env:PYTHONPATH = "src"
 python -m unittest discover -s tests -v
 ```
 
-## Demo Output
+## 演示内容
 
-The current demo simulates:
+当前 demo 会模拟以下过程：
 
-- one cast ballot
-- one challenged ballot
-- one additional cast ballot
-- final tally publication
-- public verification of the election record
+- 1 张正常投出的选票
+- 1 张被挑战的选票
+- 1 张额外正常投出的选票
+- 最终 tally 生成与公开验证
 
-Expected high-level result:
+预期结果：
 
-- `2` cast ballots
-- `1` challenged ballot
-- verification passes successfully
+- `2` 张 cast ballots
+- `1` 张 challenged ballot
+- 验证通过
 
-## Paper-to-System Mapping
+## 三篇论文与系统的对应关系
 
-### 1. Paper 613: Haechi
+### 1. 论文 613：Haechi
 
-This paper is the current foundation of the project.
+这是当前项目的核心基础。
 
-Implemented ideas:
+已经映射到系统中的内容包括：
 
-- commitment-based whole-ballot recording
-- cast-or-challenge workflow
-- public election record
-- aggregate commitment opening
-- public tally verification
+- 整票承诺
+- `cast-or-challenge` 工作流
+- 公共选举记录
+- 聚合承诺开封
+- 公开 tally 验证
 
-### 2. Paper 565: Zeeperio
+### 2. 论文 565：Zeeperio
 
-This paper is treated as a future verification upgrade.
+这篇论文在当前项目中被视为“验证层升级方向”。
 
-Planned use inside this repository:
+未来可接入方式：
 
-- replace placeholder proof objects with succinct proof artifacts
-- introduce separate receipt and dispute proof interfaces
-- optionally add automated or on-chain verification
+- 用紧凑证明替换占位式 proof 对象
+- 引入独立的 receipt proof 与 dispute proof 接口
+- 接入自动化验证甚至链上验证
 
-Current integration hook:
-
-- `src/haechi_voting/extensions.py`
-
-### 3. Paper 545: Aggios
-
-This paper is treated as a future aggregation upgrade.
-
-Planned use inside this repository:
-
-- add aggregator roles
-- support batch publication
-- add inclusion acknowledgements and dispute handling
-- add partition-proof-based verification for large-scale voting
-
-Current integration hook:
+当前预留接入点：
 
 - `src/haechi_voting/extensions.py`
 
-## Security Notes
+### 3. 论文 545：Aggios
 
-This repository currently demonstrates architecture, workflow, and commitment-based verification mechanics. It does **not** yet implement the full cryptographic security promised by the papers.
+这篇论文在当前项目中被视为“聚合层升级方向”。
 
-Important limitations:
+未来可接入方式：
 
-- proof systems are placeholders
-- there is no hardened deployment model
-- there is no trusted setup management
-- there is no real voter authentication subsystem
-- there is no adversarial network or device model beyond basic simulation
+- 增加 aggregator 角色
+- 支持批量发布 tally
+- 增加 inclusion acknowledgement 和 dispute handling
+- 引入大规模场景下的分区证明验证
 
-For that reason, this repository must not be used as a real election platform.
+当前预留接入点：
 
-## Development Roadmap
+- `src/haechi_voting/extensions.py`
 
-Recommended next steps for turning this into a competition-ready system:
+## 安全说明
 
-1. Replace placeholder proofs with a real proof backend.
-2. Add a service layer such as `FastAPI`.
-3. Add persistent storage such as `SQLite` or `PostgreSQL`.
-4. Build a reviewer-friendly web UI for device, administrator, and verifier roles.
-5. Integrate a Zeeperio-style succinct verification backend.
-6. Add an Aggios-style aggregator module for scalable batch submission.
-7. Expand the test suite to include adversarial and failure scenarios.
-8. Add deployment scripts, reproducible demo data, and architecture diagrams.
+当前仓库主要展示的是：
 
-## Documentation
+- 系统结构
+- 数据流
+- 承诺式可验证流程
+- 论文到工程实现的映射方式
+
+它**尚未**实现论文中承诺的完整密码学安全性。
+
+当前主要限制包括：
+
+- 证明系统仍是占位实现
+- 没有经过加固的部署模型
+- 没有 trusted setup 管理
+- 没有真实的选民身份认证子系统
+- 没有完善的对抗性网络和设备威胁建模
+
+因此，本项目目前不能用于真实选举场景。
+
+## 开发路线图
+
+如果要把它继续推进成更成熟的竞赛作品，建议按下面的顺序演进：
+
+1. 用真实证明后端替换占位 proof。
+2. 增加 `FastAPI` 等服务层。
+3. 增加 `SQLite` 或 `PostgreSQL` 等持久化存储。
+4. 增加适合评审展示的 Web 界面。
+5. 接入 Zeeperio 风格的紧凑验证后端。
+6. 增加 Aggios 风格的聚合器模块。
+7. 补充异常路径、安全路径、对抗场景测试。
+8. 增加部署脚本、可复现实验数据和系统架构图。
+
+## 文档说明
 
 - `README.md`
-  Project overview and usage guide.
+  项目总览、使用说明与开发路线。
 
 - `PAPER_ANALYSIS.md`
-  Detailed analysis of how the three papers map into the system architecture and how future integration should be done.
+  三篇论文如何映射到系统设计中的详细分析，以及后续如何分阶段接入 565 与 545。
 
-## Collaboration
+## 协作建议
 
-Recommended team workflow:
+推荐团队协作方式：
 
-- keep the Python framework as the main integration layer
-- isolate heavy cryptographic components into separate modules or services
-- use pull requests for feature branches
-- treat proof backends and aggregation backends as independent subsystems
+- 保持 Python 框架作为主集成层
+- 将较重的密码学模块独立为单独模块或服务
+- 通过 Pull Request 管理多人协作
+- 将 proof backend 与 aggregation backend 视为相对独立的子系统
 
-This makes it much easier for multiple teammates to collaborate without breaking the full system.
+这样可以让不同方向的成员并行推进，而不至于频繁破坏主系统。
 
 ## License
 
-No license has been added yet.
+当前仓库还没有加入许可证文件。
 
-If you plan to make this repository public or collaborate across teams, adding a clear open-source or competition-compatible license should be one of the next steps.
+如果后续准备公开展示、多人协作或持续演进，建议尽快补充明确的开源许可证或比赛允许范围内的授权说明。
