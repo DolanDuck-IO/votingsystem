@@ -10,6 +10,13 @@
 
 当前项目已经实现了一套以 `2026-613` 为核心的 Python 原型框架，并为 `2026-565` 与 `2026-545` 的后续接入预留了明确的扩展接口。
 
+在当前版本中，项目已经从纯脚本原型升级为：
+
+- 一个可运行的 Python 核心投票框架
+- 一个基于 `FastAPI + SQLite` 的可演示服务层
+- 一个连接后端 API 的单页前端控制台
+- 一组用于系统级接口验证的基础测试
+
 ## 项目定位
 
 当前状态：`可运行原型（working prototype）`
@@ -22,6 +29,10 @@
 - `cast / challenge` 投票流程
 - 公共选举记录
 - 聚合计票开封与公开验证
+- `FastAPI` 服务接口
+- `SQLite` 持久化存储
+- 审计日志
+- 单页前端演示页面
 - 面向未来证明后端与聚合后端的扩展接口
 
 尚未达到生产级：
@@ -97,15 +108,24 @@
 |-- src/
 |   `-- haechi_voting/
 |       |-- __init__.py
+|       |-- api.py
 |       |-- crypto.py
 |       |-- demo.py
 |       |-- device.py
 |       |-- extensions.py
+|       |-- main.py
 |       |-- models.py
 |       |-- proofs.py
 |       |-- record.py
+|       |-- serialization.py
+|       |-- service.py
+|       |-- static/
+|       |   |-- app.js
+|       |   |-- index.html
+|       |   `-- styles.css
 |       `-- verifier.py
 `-- tests/
+    |-- test_api_flow.py
     `-- test_demo_flow.py
 ```
 
@@ -129,6 +149,19 @@ $env:PYTHONPATH = "src"
 python -m unittest discover -s tests -v
 ```
 
+运行 API 服务：
+
+```powershell
+$env:PYTHONPATH = "src"
+python -m uvicorn haechi_voting.main:app --reload
+```
+
+默认服务启动后可访问：
+
+- `http://127.0.0.1:8000/`
+- `http://127.0.0.1:8000/app`
+- `http://127.0.0.1:8000/docs`
+
 ## 演示内容
 
 当前 demo 会模拟以下过程：
@@ -143,6 +176,41 @@ python -m unittest discover -s tests -v
 - `2` 张 cast ballots
 - `1` 张 challenged ballot
 - 验证通过
+
+## API 能力
+
+当前服务层已经提供以下核心接口：
+
+- `GET /health`
+- `GET /elections`
+- `POST /elections`
+- `GET /elections/{election_id}`
+- `POST /elections/{election_id}/ballots/prepare`
+- `POST /elections/{election_id}/ballots/{ballot_id}/cast`
+- `POST /elections/{election_id}/ballots/{ballot_id}/challenge`
+- `POST /elections/{election_id}/tally`
+- `GET /elections/{election_id}/record`
+- `GET /elections/{election_id}/verify`
+- `GET /elections/{election_id}/audit-logs`
+
+这些接口已经接入 SQLite 持久化，因此当前系统不再只是一次性脚本，而是具备了基础的服务化能力。
+
+## 前端展示层
+
+当前前端是一个直接挂载在 FastAPI 上的单页应用，用于评审展示和本地联调。
+
+主要能力：
+
+- 快速创建演示选举
+- 浏览现有选举
+- 动态渲染 ballot form
+- 执行 `prepare / cast / challenge`
+- 触发 `tally / verify`
+- 查看公开记录、验证结果和审计日志
+
+访问地址：
+
+- `http://127.0.0.1:8000/app`
 
 ## 三篇论文与系统的对应关系
 

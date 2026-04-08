@@ -1,5 +1,6 @@
 """Research-oriented voting framework inspired by Haechi."""
 
+from .api import create_app
 from .crypto import PedersenContext
 from .device import VotingDevice
 from .models import Contest, ElectionManifest
@@ -19,4 +20,5 @@ __all__ = [
     "PlaceholderTallyProofSystem",
     "PlaceholderWellFormednessProofSystem",
     "VotingDevice",
+    "create_app",
 ]
