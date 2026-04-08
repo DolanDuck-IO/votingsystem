@@ -281,9 +281,9 @@ python -m uvicorn haechi_voting.main:app --reload
 如果要把它继续推进成更成熟的竞赛作品，建议按下面的顺序演进：
 
 1. 用真实证明后端替换占位 proof。
-2. 增加 `FastAPI` 等服务层。
-3. 增加 `SQLite` 或 `PostgreSQL` 等持久化存储。
-4. 增加适合评审展示的 Web 界面。
+2. ~~增加 `FastAPI` 等服务层。~~（已完成）
+3. ~~增加 `SQLite` 或 `PostgreSQL` 等持久化存储。~~（已完成）
+4. ~~增加适合评审展示的 Web 界面。~~（已完成基础部分）
 5. 接入 Zeeperio 风格的紧凑验证后端。
 6. 增加 Aggios 风格的聚合器模块。
 7. 补充异常路径、安全路径、对抗场景测试。
