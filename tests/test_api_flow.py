@@ -88,6 +88,10 @@ class ApiFlowTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("text/html", response.headers["content-type"])
         self.assertIn("VotingSystem", response.text)
+        self.assertIn("value-modal", response.text)
+        self.assertIn("管理员", response.text)
+        self.assertIn("投票设备", response.text)
+        self.assertIn("验证者", response.text)
 
         static_response = self.client.get("/static/app.js")
         self.assertEqual(static_response.status_code, 200)

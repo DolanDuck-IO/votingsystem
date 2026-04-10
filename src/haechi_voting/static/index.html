@@ -11,14 +11,15 @@
       <header class="hero">
         <div class="hero-copy reveal">
           <p class="eyebrow">VotingSystem</p>
-          <h1>面向评审展示的可验证投票控制台</h1>
+          <h1>三角色可验证投票演示台</h1>
           <p class="hero-text">
-            这个前端直接连接当前的 FastAPI + SQLite 服务层，用一套页面串起选举创建、选票准备、
-            cast / challenge、计票、验证与审计日志。
+            当前前端按“管理员 / 投票设备 / 验证者”三个角色组织界面，
+            用同一套 FastAPI + SQLite 后端串起创建选举、准备选票、cast/challenge、
+            计票、验证、导出和审计日志查看。
           </p>
           <div class="hero-actions">
             <a class="hero-link" href="/docs" target="_blank" rel="noreferrer">查看 API 文档</a>
-            <button id="refresh-all" class="hero-link ghost" type="button">刷新系统状态</button>
+            <button id="refresh-all" class="hero-link ghost" type="button">刷新全局状态</button>
           </div>
         </div>
         <div class="hero-metrics reveal">
@@ -27,151 +28,270 @@
             <strong id="health-value">检查中</strong>
           </div>
           <div class="metric-card">
-            <span class="metric-label">当前选举</span>
-            <strong id="selected-election-label">未选择</strong>
+            <span class="metric-label">当前角色</span>
+            <strong id="active-role-label">管理员</strong>
           </div>
           <div class="metric-card">
-            <span class="metric-label">待处理选票</span>
-            <strong id="pending-count-label">0</strong>
+            <span class="metric-label">当前选举</span>
+            <strong id="selected-election-label">未选择</strong>
           </div>
         </div>
       </header>
 
-      <main class="dashboard">
-        <section class="panel reveal">
-          <div class="panel-header">
-            <div>
-              <p class="panel-kicker">Setup</p>
-              <h2>创建演示选举</h2>
-            </div>
-            <span class="panel-badge">613 主流程</span>
+      <section class="context-bar reveal">
+        <div class="context-block">
+          <span class="context-label">工作上下文</span>
+          <strong id="context-election-id">暂无</strong>
+        </div>
+        <div class="context-controls">
+          <label class="context-select">
+            <span>快速切换选举</span>
+            <select id="election-select">
+              <option value="">请选择选举</option>
+            </select>
+          </label>
+          <div class="context-counts">
+            <span>Cast <strong id="summary-cast">0</strong></span>
+            <span>Challenge <strong id="summary-challenge">0</strong></span>
+            <span>Pending <strong id="summary-pending">0</strong></span>
           </div>
+        </div>
+      </section>
 
-          <form id="create-election-form" class="stack">
-            <label class="field">
-              <span>选举 ID</span>
-              <input id="election-id" name="election_id" placeholder="demo-20260408-001" />
-            </label>
-            <label class="field">
-              <span>选举标题</span>
-              <input id="election-title" name="title" placeholder="校园理事会示范选举" />
-            </label>
-            <p class="helper">
-              将使用一个预设的双竞赛项模板：主席竞选 + 预算提案。这样能更快演示投票、挑战、计票与验证。
-            </p>
-            <button class="primary-button" type="submit">创建演示选举</button>
-          </form>
-        </section>
+      <nav class="role-tabs reveal" aria-label="角色切换">
+        <button class="role-tab active" data-role="admin" type="button">管理员</button>
+        <button class="role-tab" data-role="device" type="button">投票设备</button>
+        <button class="role-tab" data-role="verifier" type="button">验证者</button>
+      </nav>
 
-        <section class="panel reveal">
-          <div class="panel-header">
-            <div>
-              <p class="panel-kicker">Workspace</p>
-              <h2>选举列表</h2>
-            </div>
-            <span class="panel-badge">SQLite</span>
-          </div>
-          <div id="election-list" class="election-list empty-state">
-            暂无选举，先创建一个演示选举。
-          </div>
-        </section>
+      <main class="role-workspace">
+        <section class="role-view active reveal" data-role-view="admin">
+          <div class="dashboard">
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="panel-kicker">Admin Setup</p>
+                  <h2>创建演示选举</h2>
+                </div>
+                <span class="panel-badge">Manifest</span>
+              </div>
+              <form id="create-election-form" class="stack">
+                <label class="field">
+                  <span>选举 ID</span>
+                  <input id="election-id" name="election_id" placeholder="demo-20260410-001" />
+                </label>
+                <label class="field">
+                  <span>选举标题</span>
+                  <input id="election-title" name="title" placeholder="校园理事会示范选举" />
+                </label>
+                <p class="helper">
+                  使用预设模板创建一场双竞赛项选举：主席竞选与预算提案。适合快速演示完整投票流程。
+                </p>
+                <button class="primary-button" type="submit">创建演示选举</button>
+              </form>
+            </section>
 
-        <section class="panel wide reveal">
-          <div class="panel-header">
-            <div>
-              <p class="panel-kicker">Ballot Studio</p>
-              <h2>投票设备界面</h2>
-            </div>
-            <span class="panel-badge">Cast / Challenge</span>
-          </div>
-          <div id="ballot-builder" class="ballot-builder empty-state">
-            请选择一个选举后开始构造选票。
-          </div>
-          <div class="action-row">
-            <button id="prepare-ballot" class="primary-button" type="button" disabled>准备选票</button>
-            <button id="cast-ballot" class="secondary-button" type="button" disabled>Cast 当前选票</button>
-            <button id="challenge-ballot" class="secondary-button alt" type="button" disabled>Challenge 当前选票</button>
-          </div>
-        </section>
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="panel-kicker">Admin Overview</p>
+                  <h2>管理员摘要</h2>
+                </div>
+                <span class="panel-badge">Status</span>
+              </div>
+              <div class="summary-grid admin-summary-grid">
+                <div class="summary-card">
+                  <span>角色</span>
+                  <strong>管理员</strong>
+                </div>
+                <div class="summary-card">
+                  <span>状态</span>
+                  <strong id="summary-status">未选择</strong>
+                </div>
+                <div class="summary-card">
+                  <span>待处理选票</span>
+                  <strong id="pending-count-label">0</strong>
+                </div>
+                <div class="summary-card">
+                  <span>已验证</span>
+                  <strong id="verification-flag-label">否</strong>
+                </div>
+              </div>
+              <p class="helper">
+                管理员负责选举创建、切换工作上下文，并总览当前选举是否已经 tally 或 verify。
+              </p>
+            </section>
 
-        <section class="panel reveal">
-          <div class="panel-header">
-            <div>
-              <p class="panel-kicker">Current Ticket</p>
-              <h2>待处理选票</h2>
-            </div>
-            <span class="panel-badge">Pending</span>
-          </div>
-          <div id="pending-ticket" class="pending-ticket empty-state">
-            尚未生成待处理选票。
-          </div>
-        </section>
-
-        <section class="panel reveal">
-          <div class="panel-header">
-            <div>
-              <p class="panel-kicker">Election Actions</p>
-              <h2>计票与验证</h2>
-            </div>
-            <span class="panel-badge">Verify</span>
-          </div>
-          <div class="action-grid">
-            <button id="tally-election" class="primary-button" type="button" disabled>生成 Tally</button>
-            <button id="verify-election" class="secondary-button" type="button" disabled>执行验证</button>
-            <button id="reload-record" class="secondary-button alt" type="button" disabled>刷新公开记录</button>
-            <button id="reload-logs" class="secondary-button alt" type="button" disabled>刷新审计日志</button>
-          </div>
-          <div id="election-summary" class="summary-grid">
-            <div class="summary-card">
-              <span>状态</span>
-              <strong id="summary-status">未选择</strong>
-            </div>
-            <div class="summary-card">
-              <span>Cast</span>
-              <strong id="summary-cast">0</strong>
-            </div>
-            <div class="summary-card">
-              <span>Challenge</span>
-              <strong id="summary-challenge">0</strong>
-            </div>
-            <div class="summary-card">
-              <span>Pending</span>
-              <strong id="summary-pending">0</strong>
-            </div>
+            <section class="panel wide">
+              <div class="panel-header">
+                <div>
+                  <p class="panel-kicker">Admin Workspace</p>
+                  <h2>选举列表</h2>
+                </div>
+                <span class="panel-badge">SQLite</span>
+              </div>
+              <div id="election-list" class="election-list empty-state">
+                暂无选举，先创建一个演示选举。
+              </div>
+            </section>
           </div>
         </section>
 
-        <section class="panel wide reveal">
-          <div class="panel-header">
-            <div>
-              <p class="panel-kicker">Public Bulletin Board</p>
-              <h2>公开记录与验证输出</h2>
-            </div>
-            <span class="panel-badge">Record</span>
-          </div>
-          <div class="two-column">
-            <div>
-              <h3>公开记录</h3>
-              <div id="record-view" class="data-pane empty-state">暂无公开记录。</div>
-            </div>
-            <div>
-              <h3>验证结果 / Tally</h3>
-              <div id="verification-view" class="data-pane empty-state">尚未生成 tally 或验证结果。</div>
-            </div>
+        <section class="role-view reveal" data-role-view="device">
+          <div class="dashboard">
+            <section class="panel wide">
+              <div class="panel-header">
+                <div>
+                  <p class="panel-kicker">Device Console</p>
+                  <h2>投票设备界面</h2>
+                </div>
+                <span class="panel-badge">Cast / Challenge</span>
+              </div>
+              <div id="ballot-builder" class="ballot-builder empty-state">
+                请先在管理员视图中创建或选择一场选举。
+              </div>
+              <div class="action-row">
+                <button id="prepare-ballot" class="primary-button" type="button" disabled>准备选票</button>
+                <button id="cast-ballot" class="secondary-button" type="button" disabled>Cast 当前选票</button>
+                <button id="challenge-ballot" class="secondary-button alt" type="button" disabled>Challenge 当前选票</button>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="panel-kicker">Device Ticket</p>
+                  <h2>待处理选票</h2>
+                </div>
+                <span class="panel-badge">Pending</span>
+              </div>
+              <div id="pending-ticket" class="pending-ticket empty-state">
+                尚未生成待处理选票。
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="panel-kicker">Device Notes</p>
+                  <h2>角色说明</h2>
+                </div>
+                <span class="panel-badge">613</span>
+              </div>
+              <div class="notes-block">
+                <p>1. 先准备选票，设备会生成承诺、确认码和标识哈希。</p>
+                <p>2. 选民随后只能二选一：`cast` 或 `challenge`。</p>
+                <p>3. 被 challenge 的选票会公开开封，但不会进入 tally。</p>
+              </div>
+            </section>
           </div>
         </section>
 
-        <section class="panel wide reveal">
-          <div class="panel-header">
-            <div>
-              <p class="panel-kicker">Audit Trail</p>
-              <h2>审计日志</h2>
-            </div>
-            <span class="panel-badge">Logs</span>
+        <section class="role-view reveal" data-role-view="verifier">
+          <div class="dashboard">
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="panel-kicker">Verifier Actions</p>
+                  <h2>计票与验证</h2>
+                </div>
+                <span class="panel-badge">Verify</span>
+              </div>
+              <div class="action-grid">
+                <button id="tally-election" class="primary-button" type="button" disabled>生成 Tally</button>
+                <button id="verify-election" class="secondary-button" type="button" disabled>执行验证</button>
+                <button id="reload-record" class="secondary-button alt" type="button" disabled>刷新公开记录</button>
+                <button id="reload-logs" class="secondary-button alt" type="button" disabled>刷新审计日志</button>
+              </div>
+              <div class="action-grid export-grid">
+                <button id="export-record" class="secondary-button" type="button" disabled>导出公开记录</button>
+                <button id="export-verification" class="secondary-button" type="button" disabled>导出验证结果</button>
+                <button id="export-logs" class="secondary-button alt" type="button" disabled>导出审计日志</button>
+                <button id="export-election" class="secondary-button alt" type="button" disabled>导出选举快照</button>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="panel-kicker">Verifier Summary</p>
+                  <h2>验证摘要</h2>
+                </div>
+                <span class="panel-badge">Result</span>
+              </div>
+              <div class="summary-grid verifier-summary-grid">
+                <div class="summary-card">
+                  <span>Tally</span>
+                  <strong id="tally-flag-label">否</strong>
+                </div>
+                <div class="summary-card">
+                  <span>Verify</span>
+                  <strong id="verify-success-label">未执行</strong>
+                </div>
+                <div class="summary-card">
+                  <span>公开记录</span>
+                  <strong id="record-size-label">0</strong>
+                </div>
+                <div class="summary-card">
+                  <span>审计日志</span>
+                  <strong id="log-size-label">0</strong>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel wide">
+              <div class="panel-header">
+                <div>
+                  <p class="panel-kicker">Public Bulletin Board</p>
+                  <h2>公开记录与验证输出</h2>
+                </div>
+                <span class="panel-badge">Record</span>
+              </div>
+              <div class="two-column">
+                <div>
+                  <h3>公开记录</h3>
+                  <div id="record-view" class="data-pane empty-state">暂无公开记录。</div>
+                </div>
+                <div>
+                  <h3>Tally / 验证结果</h3>
+                  <div id="verification-view" class="data-pane empty-state">尚未生成 tally 或验证结果。</div>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel wide">
+              <div class="panel-header">
+                <div>
+                  <p class="panel-kicker">Audit Trail</p>
+                  <h2>审计日志</h2>
+                </div>
+                <span class="panel-badge">Logs</span>
+              </div>
+              <div id="audit-log-view" class="timeline empty-state">选择一个选举后查看审计日志。</div>
+            </section>
           </div>
-          <div id="audit-log-view" class="timeline empty-state">选择一个选举后查看审计日志。</div>
         </section>
       </main>
+    </div>
+
+    <div id="value-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="value-modal-title">
+      <div class="modal-backdrop" data-close-modal="true"></div>
+      <div class="modal-card">
+        <div class="modal-header">
+          <div>
+            <p class="panel-kicker">Full Value</p>
+            <h2 id="value-modal-title">完整内容</h2>
+          </div>
+          <button id="close-value-modal" class="modal-close" type="button" aria-label="关闭">×</button>
+        </div>
+        <div class="modal-body">
+          <pre id="value-modal-content"></pre>
+        </div>
+        <div class="modal-actions">
+          <button id="copy-value-modal" class="secondary-button" type="button">复制内容</button>
+          <button id="confirm-value-modal" class="primary-button" type="button">关闭</button>
+        </div>
+      </div>
     </div>
 
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>

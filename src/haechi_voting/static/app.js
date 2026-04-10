@@ -7,12 +7,21 @@ const state = {
   pendingBallot: null,
   tallyResult: null,
   verificationResult: null,
+  activeRole: "admin",
 };
 
 const elements = {
   healthValue: document.getElementById("health-value"),
+  activeRoleLabel: document.getElementById("active-role-label"),
   selectedElectionLabel: document.getElementById("selected-election-label"),
+  contextElectionId: document.getElementById("context-election-id"),
+  electionSelect: document.getElementById("election-select"),
   pendingCountLabel: document.getElementById("pending-count-label"),
+  verificationFlagLabel: document.getElementById("verification-flag-label"),
+  tallyFlagLabel: document.getElementById("tally-flag-label"),
+  verifySuccessLabel: document.getElementById("verify-success-label"),
+  recordSizeLabel: document.getElementById("record-size-label"),
+  logSizeLabel: document.getElementById("log-size-label"),
   electionList: document.getElementById("election-list"),
   ballotBuilder: document.getElementById("ballot-builder"),
   pendingTicket: document.getElementById("pending-ticket"),
@@ -30,25 +39,42 @@ const elements = {
   verifyButton: document.getElementById("verify-election"),
   reloadRecordButton: document.getElementById("reload-record"),
   reloadLogsButton: document.getElementById("reload-logs"),
+  exportRecordButton: document.getElementById("export-record"),
+  exportVerificationButton: document.getElementById("export-verification"),
+  exportLogsButton: document.getElementById("export-logs"),
+  exportElectionButton: document.getElementById("export-election"),
   createElectionForm: document.getElementById("create-election-form"),
   refreshAll: document.getElementById("refresh-all"),
+  valueModal: document.getElementById("value-modal"),
+  valueModalTitle: document.getElementById("value-modal-title"),
+  valueModalContent: document.getElementById("value-modal-content"),
+  closeValueModal: document.getElementById("close-value-modal"),
+  confirmValueModal: document.getElementById("confirm-value-modal"),
+  copyValueModal: document.getElementById("copy-value-modal"),
   toast: document.getElementById("toast"),
   electionIdInput: document.getElementById("election-id"),
   electionTitleInput: document.getElementById("election-title"),
+  roleTabs: [...document.querySelectorAll(".role-tab")],
+  roleViews: [...document.querySelectorAll(".role-view")],
 };
+
+function apiHeaders(extra = {}) {
+  return {
+    "Content-Type": "application/json",
+    ...extra,
+  };
+}
 
 async function apiRequest(path, options = {}) {
   const response = await fetch(path, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
+    headers: apiHeaders(options.headers),
     ...options,
   });
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json") ? await response.json() : await response.text();
   if (!response.ok) {
-    const message = typeof payload === "object" && payload !== null ? payload.detail || JSON.stringify(payload) : String(payload);
+    const message =
+      typeof payload === "object" && payload !== null ? payload.detail || JSON.stringify(payload) : String(payload);
     throw new Error(message);
   }
   return payload;
@@ -65,6 +91,51 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;");
 }
 
+function truncateValue(value, visible = 10) {
+  const text = String(value ?? "");
+  if (text.length <= visible * 2) {
+    return text;
+  }
+  return `${text.slice(0, visible)}...${text.slice(-visible)}`;
+}
+
+function buildRevealButton(label, value) {
+  const text = String(value ?? "");
+  return `
+    <button
+      class="value-chip"
+      type="button"
+      data-reveal-title="${escapeHtml(label)}"
+      data-reveal-value="${escapeHtml(text)}"
+      title="单击查看完整内容"
+    >
+      ${escapeHtml(truncateValue(text))}
+    </button>
+  `;
+}
+
+function openValueModal(title, value) {
+  elements.valueModalTitle.textContent = title;
+  elements.valueModalContent.textContent = String(value ?? "");
+  elements.valueModal.dataset.currentValue = String(value ?? "");
+  elements.valueModal.classList.remove("hidden");
+}
+
+function closeValueModal() {
+  elements.valueModal.classList.add("hidden");
+  elements.valueModal.dataset.currentValue = "";
+}
+
+async function copyCurrentModalValue() {
+  const value = elements.valueModal.dataset.currentValue || "";
+  try {
+    await navigator.clipboard.writeText(value);
+    showToast("完整内容已复制");
+  } catch (error) {
+    showToast("复制失败，请手动复制", "error");
+  }
+}
+
 function showToast(message, type = "info") {
   elements.toast.textContent = message;
   elements.toast.className = `toast ${type === "error" ? "error" : ""}`;
@@ -72,6 +143,23 @@ function showToast(message, type = "info") {
   showToast.timer = window.setTimeout(() => {
     elements.toast.className = "toast hidden";
   }, 2800);
+}
+
+function setActiveRole(role) {
+  state.activeRole = role;
+  const roleLabel = {
+    admin: "管理员",
+    device: "投票设备",
+    verifier: "验证者",
+  };
+  elements.activeRoleLabel.textContent = roleLabel[role] || role;
+
+  elements.roleTabs.forEach((button) => {
+    button.classList.toggle("active", button.dataset.role === role);
+  });
+  elements.roleViews.forEach((view) => {
+    view.classList.toggle("active", view.dataset.roleView === role);
+  });
 }
 
 function buildDemoManifest() {
@@ -109,6 +197,18 @@ function buildDemoManifest() {
   };
 }
 
+function downloadJson(filename, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 async function refreshHealth() {
   try {
     const data = await apiRequest("/health");
@@ -123,6 +223,7 @@ async function refreshElectionList(selectElectionId = state.currentElectionId) {
   const elections = await apiRequest("/elections");
   state.elections = elections;
   renderElectionList();
+  renderElectionSelect();
   if (selectElectionId) {
     const exists = elections.some((item) => item.election_id === selectElectionId);
     if (exists) {
@@ -134,7 +235,19 @@ async function refreshElectionList(selectElectionId = state.currentElectionId) {
     await loadElection(elections[0].election_id);
   } else {
     syncSummary();
+    updateActionButtons();
   }
+}
+
+function renderElectionSelect() {
+  const options = ['<option value="">请选择选举</option>'];
+  for (const election of state.elections) {
+    const selected = election.election_id === state.currentElectionId ? "selected" : "";
+    options.push(
+      `<option value="${escapeHtml(election.election_id)}" ${selected}>${escapeHtml(election.title)}</option>`
+    );
+  }
+  elements.electionSelect.innerHTML = options.join("");
 }
 
 function renderElectionList() {
@@ -175,16 +288,20 @@ async function loadElection(electionId, options = {}) {
     apiRequest(`/elections/${encodeURIComponent(electionId)}/record`),
     apiRequest(`/elections/${encodeURIComponent(electionId)}/audit-logs`),
   ]);
+
   state.currentElectionId = electionId;
   state.currentElection = detail;
   state.currentRecord = record;
   state.currentLogs = logs;
   state.tallyResult = detail.tally || null;
   state.verificationResult = detail.verification || null;
+
   if (!preservePending) {
     state.pendingBallot = null;
   }
+
   renderElectionList();
+  renderElectionSelect();
   renderCurrentElection();
   showToast(`已载入选举：${detail.title}`);
 }
@@ -193,22 +310,40 @@ function renderCurrentElection() {
   const election = state.currentElection;
   if (!election) {
     elements.selectedElectionLabel.textContent = "未选择";
+    elements.contextElectionId.textContent = "暂无";
     elements.pendingCountLabel.textContent = "0";
+    elements.verificationFlagLabel.textContent = "否";
+    elements.tallyFlagLabel.textContent = "否";
+    elements.verifySuccessLabel.textContent = "未执行";
+    elements.recordSizeLabel.textContent = "0";
+    elements.logSizeLabel.textContent = "0";
+
     elements.ballotBuilder.className = "ballot-builder empty-state";
-    elements.ballotBuilder.textContent = "请选择一个选举后开始构造选票。";
+    elements.ballotBuilder.textContent = "请先在管理员视图中创建或选择一场选举。";
+    elements.pendingTicket.className = "pending-ticket empty-state";
+    elements.pendingTicket.textContent = "尚未生成待处理选票。";
     elements.recordView.className = "data-pane empty-state";
     elements.recordView.textContent = "暂无公开记录。";
     elements.verificationView.className = "data-pane empty-state";
     elements.verificationView.textContent = "尚未生成 tally 或验证结果。";
     elements.auditLogView.className = "timeline empty-state";
     elements.auditLogView.textContent = "选择一个选举后查看审计日志。";
+
     syncSummary();
     updateActionButtons();
     return;
   }
 
   elements.selectedElectionLabel.textContent = election.title;
+  elements.contextElectionId.textContent = election.election_id;
   elements.pendingCountLabel.textContent = String(election.pending_ballot_count);
+  elements.verificationFlagLabel.textContent = election.has_verification ? "是" : "否";
+  elements.tallyFlagLabel.textContent = election.has_tally ? "是" : "否";
+  elements.verifySuccessLabel.textContent =
+    election.verification == null ? "未执行" : election.verification.success ? "通过" : "未通过";
+  elements.recordSizeLabel.textContent = String(state.currentRecord?.entries?.length || 0);
+  elements.logSizeLabel.textContent = String(state.currentLogs?.length || 0);
+
   renderBallotBuilder(election.manifest);
   renderPendingBallot();
   renderRecord();
@@ -219,27 +354,34 @@ function renderCurrentElection() {
 }
 
 function renderBallotBuilder(manifest) {
-  const contests = manifest.contests || [];
+  const contests = manifest?.contests || [];
+  if (contests.length === 0) {
+    elements.ballotBuilder.className = "ballot-builder empty-state";
+    elements.ballotBuilder.textContent = "当前选举没有可用竞赛项。";
+    return;
+  }
+
   elements.ballotBuilder.className = "ballot-builder";
   elements.ballotBuilder.innerHTML = `
     <div class="contest-grid">
       ${contests
         .map((contest) => {
           const inputType = contest.max_selections === 1 ? "radio" : "checkbox";
-          const options = contest.candidates
-            .map(
-              (candidate) => `
-                <label class="contest-option">
-                  <input type="${inputType}" name="contest-${escapeHtml(contest.contest_id)}" value="${escapeHtml(candidate)}" />
-                  <span>${escapeHtml(candidate)}</span>
-                </label>
-              `
-            )
-            .join("");
           return `
             <section class="contest-card" data-contest-id="${escapeHtml(contest.contest_id)}" data-max="${contest.max_selections}">
               <h3>${escapeHtml(contest.title)}</h3>
-              <div class="contest-option-list">${options}</div>
+              <div class="contest-option-list">
+                ${contest.candidates
+                  .map(
+                    (candidate) => `
+                      <label class="contest-option">
+                        <input type="${inputType}" name="contest-${escapeHtml(contest.contest_id)}" value="${escapeHtml(candidate)}" />
+                        <span>${escapeHtml(candidate)}</span>
+                      </label>
+                    `
+                  )
+                  .join("")}
+              </div>
               <p class="contest-meta">规则：最少 ${contest.min_selections} 项，最多 ${contest.max_selections} 项</p>
             </section>
           `;
@@ -290,17 +432,23 @@ function renderPendingBallot() {
       </div>
       <div class="ticket-card">
         <span>Confirmation Code</span>
-        <strong>${escapeHtml(ballot.confirmation_code)}</strong>
+        <strong>${buildRevealButton("Confirmation Code", ballot.confirmation_code)}</strong>
       </div>
       <div class="ticket-card">
         <span>Identifier Hash</span>
-        <strong>${escapeHtml(ballot.identifier_hash)}</strong>
+        <strong>${buildRevealButton("Identifier Hash", ballot.identifier_hash)}</strong>
       </div>
     </div>
     <div class="code-block" style="margin-top: 12px;">
       <pre>${escapeHtml(formatJson(ballot))}</pre>
     </div>
   `;
+
+  elements.pendingTicket.querySelectorAll("[data-reveal-value]").forEach((button) => {
+    button.addEventListener("click", () => {
+      openValueModal(button.dataset.revealTitle || "完整内容", button.dataset.revealValue || "");
+    });
+  });
 }
 
 function renderRecord() {
@@ -319,10 +467,12 @@ function renderVerification() {
     elements.verificationView.textContent = "尚未生成 tally 或验证结果。";
     return;
   }
+  const payload = {
+    tally: state.tallyResult,
+    verification: state.verificationResult,
+  };
   elements.verificationView.className = "data-pane";
-  elements.verificationView.innerHTML = `<pre>${escapeHtml(
-    formatJson({ tally: state.tallyResult, verification: state.verificationResult })
-  )}</pre>`;
+  elements.verificationView.innerHTML = `<pre>${escapeHtml(formatJson(payload))}</pre>`;
 }
 
 function renderAuditLogs() {
@@ -356,6 +506,10 @@ function syncSummary() {
 function updateActionButtons() {
   const hasElection = Boolean(state.currentElectionId);
   const hasPending = Boolean(state.pendingBallot);
+  const hasRecord = Boolean(state.currentRecord);
+  const hasLogs = Boolean(state.currentLogs && state.currentLogs.length);
+  const hasVerification = Boolean(state.verificationResult || state.tallyResult);
+
   elements.prepareButton.disabled = !hasElection;
   elements.castButton.disabled = !hasElection || !hasPending;
   elements.challengeButton.disabled = !hasElection || !hasPending;
@@ -363,6 +517,10 @@ function updateActionButtons() {
   elements.verifyButton.disabled = !hasElection;
   elements.reloadRecordButton.disabled = !hasElection;
   elements.reloadLogsButton.disabled = !hasElection;
+  elements.exportRecordButton.disabled = !hasRecord;
+  elements.exportVerificationButton.disabled = !hasVerification;
+  elements.exportLogsButton.disabled = !hasLogs;
+  elements.exportElectionButton.disabled = !hasElection;
 }
 
 async function handleCreateElection(event) {
@@ -441,7 +599,10 @@ async function handleVerifyElection() {
   try {
     state.verificationResult = await apiRequest(`/elections/${encodeURIComponent(state.currentElectionId)}/verify`);
     await loadElection(state.currentElectionId);
-    showToast(state.verificationResult.success ? "验证通过" : "验证未通过", state.verificationResult.success ? "info" : "error");
+    showToast(
+      state.verificationResult.success ? "验证通过" : "验证未通过",
+      state.verificationResult.success ? "info" : "error"
+    );
   } catch (error) {
     showToast(`验证失败：${error.message}`, "error");
   }
@@ -452,6 +613,7 @@ async function handleReloadRecord() {
   try {
     state.currentRecord = await apiRequest(`/elections/${encodeURIComponent(state.currentElectionId)}/record`);
     renderRecord();
+    updateActionButtons();
     showToast("公开记录已刷新");
   } catch (error) {
     showToast(`刷新公开记录失败：${error.message}`, "error");
@@ -463,16 +625,63 @@ async function handleReloadLogs() {
   try {
     state.currentLogs = await apiRequest(`/elections/${encodeURIComponent(state.currentElectionId)}/audit-logs`);
     renderAuditLogs();
+    updateActionButtons();
     showToast("审计日志已刷新");
   } catch (error) {
     showToast(`刷新审计日志失败：${error.message}`, "error");
   }
 }
 
+function handleExportRecord() {
+  if (!state.currentElectionId || !state.currentRecord) return;
+  downloadJson(`${state.currentElectionId}-record.json`, state.currentRecord);
+  showToast("公开记录已导出");
+}
+
+function handleExportVerification() {
+  if (!state.currentElectionId || (!state.tallyResult && !state.verificationResult)) return;
+  downloadJson(`${state.currentElectionId}-verification.json`, {
+    tally: state.tallyResult,
+    verification: state.verificationResult,
+  });
+  showToast("验证结果已导出");
+}
+
+function handleExportLogs() {
+  if (!state.currentElectionId || !state.currentLogs) return;
+  downloadJson(`${state.currentElectionId}-audit-logs.json`, state.currentLogs);
+  showToast("审计日志已导出");
+}
+
+function handleExportElection() {
+  if (!state.currentElectionId || !state.currentElection) return;
+  downloadJson(`${state.currentElectionId}-snapshot.json`, {
+    election: state.currentElection,
+    record: state.currentRecord,
+    logs: state.currentLogs,
+    pendingBallot: state.pendingBallot,
+    tally: state.tallyResult,
+    verification: state.verificationResult,
+  });
+  showToast("选举快照已导出");
+}
+
 async function initialize() {
   const now = new Date();
   elements.electionIdInput.value = `demo-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
   elements.electionTitleInput.value = "校园理事会示范选举";
+
+  elements.roleTabs.forEach((button) => {
+    button.addEventListener("click", () => {
+      setActiveRole(button.dataset.role);
+    });
+  });
+
+  elements.electionSelect.addEventListener("change", async (event) => {
+    if (event.target.value) {
+      await loadElection(event.target.value);
+    }
+  });
 
   elements.createElectionForm.addEventListener("submit", handleCreateElection);
   elements.prepareButton.addEventListener("click", handlePrepareBallot);
@@ -482,6 +691,24 @@ async function initialize() {
   elements.verifyButton.addEventListener("click", handleVerifyElection);
   elements.reloadRecordButton.addEventListener("click", handleReloadRecord);
   elements.reloadLogsButton.addEventListener("click", handleReloadLogs);
+  elements.exportRecordButton.addEventListener("click", handleExportRecord);
+  elements.exportVerificationButton.addEventListener("click", handleExportVerification);
+  elements.exportLogsButton.addEventListener("click", handleExportLogs);
+  elements.exportElectionButton.addEventListener("click", handleExportElection);
+  elements.closeValueModal.addEventListener("click", closeValueModal);
+  elements.confirmValueModal.addEventListener("click", closeValueModal);
+  elements.copyValueModal.addEventListener("click", copyCurrentModalValue);
+  elements.valueModal.addEventListener("click", (event) => {
+    if (event.target instanceof HTMLElement && event.target.dataset.closeModal === "true") {
+      closeValueModal();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !elements.valueModal.classList.contains("hidden")) {
+      closeValueModal();
+    }
+  });
+
   elements.refreshAll.addEventListener("click", async () => {
     try {
       await refreshHealth();
@@ -492,6 +719,7 @@ async function initialize() {
     }
   });
 
+  setActiveRole("admin");
   await refreshHealth();
   await refreshElectionList();
 }
