@@ -93,10 +93,10 @@ function escapeHtml(value) {
 
 function truncateValue(value, visible = 10) {
   const text = String(value ?? "");
-  if (text.length <= visible * 2) {
+  if (text.length <= visible) {
     return text;
   }
-  return `${text.slice(0, visible)}...${text.slice(-visible)}`;
+  return `${text.slice(0, visible)}...`;
 }
 
 function buildRevealButton(label, value) {
